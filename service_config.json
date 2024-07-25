@@ -1,0 +1,15 @@
+{
+    "name": "oak1",
+    "port": 50010,
+    "host": "green-guava",
+    "log_level": "INFO",
+    "subscriptions": [
+        {
+            "uri": {
+                "path": "/rgb",
+                "query": "service_name=oak1"
+            },
+            "every_n": 5
+        }
+    ]
+}
