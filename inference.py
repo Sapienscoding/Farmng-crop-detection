@@ -3,9 +3,7 @@ import argparse
 import asyncio
 from pathlib import Path
 import cv2
-import torch
 import numpy as np
-import cupy as cp
 from farm_ng.core.event_client import EventClient
 from farm_ng.core.event_service_pb2 import EventServiceConfig
 from farm_ng.core.events_file_reader import proto_from_json_file
@@ -15,134 +13,127 @@ import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.autoinit
 np.bool = np.bool_
-class TensorRTInference:
-    def __init__(self, engine_path):
-        self.logger = trt.Logger(trt.Logger.WARNING)
-        with open(engine_path, "rb") as f, trt.Runtime(self.logger) as runtime:
-            self.engine = runtime.deserialize_cuda_engine(f.read())
-        self.context = self.engine.create_execution_context()
-        self.inputs, self.outputs, self.bindings, self.stream = self.allocate_buffers()
 
-    def allocate_buffers(self):
-        inputs = []
-        outputs = []
-        bindings = []
-        stream = cuda.Stream()
-        
-        for idx in range(self.engine.num_io_tensors):
-            name = self.engine.get_tensor_name(idx)
-            shape = self.engine.get_tensor_shape(name)
-            if shape[0] == -1:  # Dynamic batch size
-                shape = (1,) + shape[1:]  # Assume batch size of 1 for now
-            size = trt.volume(shape)
-            dtype = trt.nptype(self.engine.get_tensor_dtype(name))
-            
-            # Allocate host and device buffers
-            host_mem = cuda.pagelocked_empty(size, dtype)
-            device_mem = cuda.mem_alloc(host_mem.nbytes)
-            
-            # Append the device buffer to device bindings.
-            bindings.append(int(device_mem))
-            
-            # Append to the appropriate list.
-            if self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
-                inputs.append({"host": host_mem, "device": device_mem})
-            else:
-                outputs.append({"host": host_mem, "device": device_mem})
-        
-        return inputs, outputs, bindings, stream
+# TensorRT and CUDA setup
+TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+trt.init_libnvinfer_plugins(TRT_LOGGER, '')
 
-    def infer(self, img):
-        # Copy input image to pagelocked memory.
-        np.copyto(self.inputs[0]["host"], img.ravel())
-        
-        # Transfer input data to the GPU.
-        for inp in self.inputs:
-            cuda.memcpy_htod_async(inp["device"], inp["host"], self.stream)
-        
-        # Run inference.
-        self.context.execute_async_v2(bindings=self.bindings, stream_handle=self.stream.handle)
-        
-        # Transfer predictions back from the GPU.
-        for out in self.outputs:
-            cuda.memcpy_dtoh_async(out["host"], out["device"], self.stream)
-        
-        # CUDA operation: ensures that all previously enqueued CUDA operations in the given stream have completed before the host program continues execution
-        self.stream.synchronize()
-        
-        # Return only the host outputs.
-        return [out["host"] for out in self.outputs]
+def load_engine(engine_path):
+    with open(engine_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
+        engine = runtime.deserialize_cuda_engine(f.read())
+    return engine
 
-def process_output(output, img_shape, conf_threshold=0.9, iou_threshold=0.4):
-    output = output.reshape((-1, 7))  # Reshape to [num_boxes, 7]
-    valid = output[:, 4] > conf_threshold
-    boxes = output[valid, :4]
-    scores = output[valid, 4]
-    classes = output[valid, 5].astype(int)
+def allocate_buffers(engine):
+    inputs = []
+    outputs = []
+    bindings = []
+    for idx in range(engine.num_bindings):
+        binding = engine[idx]
+        shape = engine.get_binding_shape(binding)
+        size = trt.volume(shape)
+        dtype = trt.nptype(engine.get_binding_dtype(binding))
+        host_mem = cuda.pagelocked_empty(size, dtype)
+        device_mem = cuda.mem_alloc(host_mem.nbytes)
+        bindings.append(int(device_mem))
+        if engine.get_tensor_mode(binding) == trt.TensorIOMode.INPUT:
+            inputs.append({'host': host_mem, 'device': device_mem})
+        else:
+            outputs.append({'host': host_mem, 'device': device_mem})
+    return inputs, outputs, bindings
+
+def preprocess_image(image):
+    # Resize and normalize the image
+    input_size = (640, 640)
+    image = cv2.resize(image, input_size)
+    image = image.astype(np.float32) / 255.0
+    image = np.transpose(image, (2, 0, 1))  # HWC to CHW
+    image = np.expand_dims(image, axis=0)  # Add batch dimension
+    return image
+
+def postprocess(outputs, image_size, input_size=(640, 640), conf_threshold=0.7):
+    # Assuming outputs[0]['host'] contains the model output
+    predictions = np.frombuffer(outputs[0]['host'], dtype=np.float32).reshape(1, -1, 6)  # Adjust 6 if different
     
-    if len(boxes) == 0:
-        return np.array([]), np.array([]), np.array([])
-
-    # Convert boxes from [x, y, w, h] to [x1, y1, x2, y2]
-    boxes[:, 2:] += boxes[:, :2]
+    # Scale coordinates to original image size
+    scale_x = image_size[1] / input_size[1]
+    scale_y = image_size[0] / input_size[0]
     
-    # Scale boxes to original image size
-    boxes[:, [0, 2]] *= img_shape[1] / 640
-    boxes[:, [1, 3]] *= img_shape[0] / 640
+    results = []
+    for pred in predictions:
+        boxes = []
+        scores = []
+        class_ids = []
+        for detection in pred:
+            confidence = detection[4] * detection[5]
+            if confidence > conf_threshold:
+                x1, y1, x2, y2 = detection[:4]
+                x1 *= scale_x
+                x2 *= scale_x
+                y1 *= scale_y
+                y2 *= scale_y
+                boxes.append([x1, y1, x2, y2])
+                scores.append(confidence)
+                class_ids.append(0 if detection[5] > 0.5 else 1)  # Assuming binary classification
+        
+        results.append({
+            'boxes': np.array(boxes),
+            'scores': np.array(scores),
+            'class_ids': np.array(class_ids)
+        })
     
-    indices = cv2.dnn.NMSBoxes(boxes.tolist(), scores.tolist(), conf_threshold, iou_threshold)
-
-    if len(indices) == 0:
-        return np.array([]), np.array([]), np.array([])
-    
-    return boxes[indices], scores[indices], classes[indices]
+    return results
 
 async def main(service_config_path: Path, engine_path: Path) -> None:
-    if not torch.cuda.is_available():
-        print("CUDA is not available")
-    else:
-        print(f"Using CUDA Device: {torch.cuda.get_device_name(0)}")
+    # Load TensorRT engine
+    engine = load_engine(engine_path)
+    context = engine.create_execution_context()
+    inputs, outputs, bindings = allocate_buffers(engine)
 
+    input_shape = engine.get_binding_shape(0)  # Assuming the first binding is the input
+    context.set_binding_shape(0, input_shape)
+
+    # Create a client to the camera service
     config: EventServiceConfig = proto_from_json_file(service_config_path, EventServiceConfig())
-    trt_inference = TensorRTInference(engine_path)
+    
+    class_names = {0: 'Ripe', 1: 'Unripe'}  # Adjust based on your model's classes
     
     async for event, message in EventClient(config).subscribe(config.subscriptions[0], decode=True):
         stamp = (
             get_stamp_by_semantics_and_clock_type(event, StampSemantics.DRIVER_RECEIVE, "monotonic")
             or event.timestamps[0].stamp
         )
-        print(f"Timestamp: {stamp}\n")
-        print(f"Meta: {message.meta}")
-        print("###################\n")
         
+        # Cast image data bytes to numpy and decode
         image = cv2.imdecode(np.frombuffer(message.image_data, dtype="uint8"), cv2.IMREAD_UNCHANGED)
-        # if event.uri.path == "/disparity":
-        #     image = cv2.applyColorMap(image * 3, cv2.COLORMAP_JET)
         
-        # Preprocess image for inference
-        input_image = cv2.resize(image, (640, 640))
-        # OpenCV reads in BGR format
-        input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
-        # Normalize image [0,1]
-        input_image = input_image.astype(np.float32) / 255.0
-        # Changes the order to (C,H,W)
-        input_image = np.transpose(input_image, (2, 0, 1))
-        input_image = np.expand_dims(input_image, axis=0)
-
-        # Perform inference
-        output = trt_inference.infer(input_image)[0]
+        # Preprocess the image
+        input_data = preprocess_image(image)
         
-        # Process output and draw bounding boxes
-        boxes, scores, classes = process_output(output, image.shape)
+        # Copy input data to the GPU
+        np.copyto(inputs[0]['host'], input_data.ravel())
+        cuda.memcpy_htod(inputs[0]['device'], inputs[0]['host'])
         
-        if len(boxes)>0:
-            for box, score, cls in zip(boxes, scores, classes):
-                x1, y1, x2, y2 = box.astype(int)
-                label = f"{'Ripe' if cls == 0 else 'Unripe'}: {score:.2f}"
-                cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(image, label, ((x1 + x2) // 2, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            
-        cv2.namedWindow("image", cv2.WINDOW_AUTOSIZE)
+        # Run inference
+        context.execute_v2(bindings=bindings)
+        
+        # Copy outputs from the GPU
+        for out in outputs:
+            cuda.memcpy_dtoh(out['host'], out['device'])
+        
+        # Postprocess the results
+        results = postprocess(outputs, image.shape[:2])
+        
+        # Draw bounding boxes and labels
+        for r in results:
+            for box, score, class_id in zip(r['boxes'], r['scores'], r['class_ids']):
+                x1, y1, x2, y2 = box
+                class_name = class_names[class_id]
+                label = f"{class_name}: {score:.2f}"
+                cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
+                cv2.putText(image, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1, cv2.LINE_AA)
+        
+        # Visualize the image
+        cv2.namedWindow("image", cv2.WINDOW_NORMAL)
         cv2.imshow("image", image)
         cv2.waitKey(1)
 
