@@ -1,3 +1,7 @@
-farm-ng-amiga
-opencv-python==4.6.0.66
-numpy==1.23.2
+farm_ng_amiga==2.3.1
+farm_ng_core==2.3.0
+farm_ng_package==0.1.3
+numpy==1.24.4
+opencv_python==4.10.0.84
+ultralytics==8.2.57
+ultralytics==8.2.58

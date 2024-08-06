@@ -9,7 +9,7 @@
                 "path": "/rgb",
                 "query": "service_name=oak1"
             },
-            "every_n": 5
+            "every_n": 2
         }
     ]
 }
