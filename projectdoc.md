@@ -26,3 +26,45 @@
     - npm(v10.8.2)
     - nvm(v0.39.7)
     - FastAPI
+
+## 🚥 Running the Project
+### To run the project on the brain of Amiga, follow these steps:
+- Use your SSH credentials to SSH to one of the Amiga's, using 
+```bash
+ssh green-guava 
+```
+- Switch to your user profile on the brain
+```bash
+cd /mnt/managed_home/farm-ng-user-<username>
+```
+- Create a python virtual enviornment, using 
+```bash
+python -m venv <virtual-env-name>
+```
+- Activate the virtual enviornment
+```bash
+source <virtaul-env-name>/bin/activate
+```
+- Clone the Farmng-crop-detection repository
+```bash
+git clone --branch master https://github.com/Sapienscoding/Farmng-crop-detection.git
+```
+- Change to repo directory
+```bash
+cd Farmng-crop-detection
+```
+- Install the dependencies
+```bash
+pip -r install requirement.txt
+```
+- To run the inference on the brain
+```python
+python test.py --service-config service_config.json --model-path yv8_64.engine
+```
+
+## 🪄 Improvements
+- Making dataset more robust, in distinguishing which one is strawberry and which one is not 
+- Training the model for other crops
+- Extracting insightful data for users to visualize.
+- Geo-tagging the detections
+
