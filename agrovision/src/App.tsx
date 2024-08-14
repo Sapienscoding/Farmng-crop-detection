@@ -1,17 +1,13 @@
-import React, { useState } from "react";
-import logo from "./logo.svg";
-import HomeScreen from "./Homescreen";
-import "./App.css";
+import React from 'react';
+import HomeScreen from './components/HomeScreen';
+import './App.css';
 
-import CounterComponent from "./components/counterComponent";
-
-function App() {
-  const [currentView, setCurrentView] = useState<"home" | "counter">("home");
-
-  return <div className="App">
-    {currentView === "home" && <HomeScreen setCurrentView={setCurrentView}/>}
-    {currentView === "counter" && <CounterComponent setCurrentView={setCurrentView} />}
-    </div>;
-}
+const App: React.FC = () => {
+  return (
+    <div className="App">
+      <HomeScreen />
+    </div>
+  );
+};
 
 export default App;

@@ -31,7 +31,7 @@
 ### To run the project on the brain of Amiga, follow these steps:
 - Use your SSH credentials to SSH to one of the Amiga's, using 
 ```bash
-ssh green-guava 
+ssh <brain-name> 
 ```
 - Switch to your user profile on the brain
 ```bash
