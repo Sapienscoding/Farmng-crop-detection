@@ -33,7 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from google.protobuf.json_format import MessageToJson
-from test import YoloInference
+from inference import YoloInference
 
 
 # FastAPI app with lifespan context manager

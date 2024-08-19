@@ -4,6 +4,6 @@
         "name": "amiga",
         "port": 50010,
         "host": "localhost"
-      },
+      }
     ]
   }

@@ -38,6 +38,7 @@ const HomeScreen: React.FC = () => {
         </div>
         <CameraView
           label= {selectedCamera + " View"}
+          oakID={selectedCamera}
         />
       </div>
       <div className='button-component'>

@@ -95,8 +95,8 @@ if __name__ == "__main__":
     parser.add_argument("--service-config", type=Path, required=True, help="The camera config.")
     parser.add_argument("--model-path", type=Path, required=True, help="Path to the YOLOv8 .pt model file.")
     args = parser.parse_args()
-    inference = YoloInference()
-    asyncio.run(inference.run_model(args.service_config, args.model_path))
+    # inference = YoloInference()
+    # asyncio.run(inference.run_model(args.service_config, args.model_path))
 
     # put time ticks in the for loop
     # How long the for loop sit
