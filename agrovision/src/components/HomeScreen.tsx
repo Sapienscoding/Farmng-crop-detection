@@ -8,38 +8,6 @@ const HomeScreen: React.FC = () => {
   const [selectedCrop, setSelectedCrop] = useState('Strawberry');
   const [selectedCamera, setSelectedCamera] = useState('Oak0');
 
-  // useEffect(() => {
-  //   // This effect will run whenever selectedCamera changes
-  //   if (selectedCamera) {
-  //     sendCameraSelection(selectedCamera);
-  //   }
-  // }, [selectedCamera]);
-
-  const sendCameraSelection = async (camera: string) => {
-    const oakNumber = camera.replace('Oak', '');
-    console.log(oakNumber)
-    try {
-      const response = await fetch(`http://${window.location.hostname}:8042/oak/${oakNumber}`, {
-
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // You can add a body if needed
-        // body: JSON.stringify({ oak: oakNumber }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Camera selection successful:', data);
-    } catch (error) {
-      console.error('Error selecting camera:', error);
-    }
-  };
-
   const handleStartInference = () => {
     console.log('Starting inference');
     // Add your inference logic here

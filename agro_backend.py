@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import base64
 from pathlib import Path
 from typing import Optional
 import uvicorn
@@ -14,11 +13,10 @@ from farm_ng.core.event_client_manager import (
 from farm_ng.core.event_service_pb2 import (EventServiceConfigList, SubscribeRequest, SubscribeReply)
 from farm_ng.core.events_file_reader import proto_from_json_file
 from farm_ng.core.uri_pb2 import Uri
-from fastapi import FastAPI,WebSocket,HTTPException
+from fastapi import FastAPI,WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from google.protobuf.json_format import MessageToJson
 from inference import YoloInference
 
 

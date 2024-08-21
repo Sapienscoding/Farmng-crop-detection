@@ -1,8 +1,5 @@
 import React, { useState, useEffect} from "react";
 
-// import { SubscribeReply, OakFrame } from "farm_ng_proto";
-// import { error } from "console";
-
 interface CameraViewProps {
   label: string;
   oakID: string;
@@ -32,13 +29,6 @@ const CameraView: React.FC<CameraViewProps> = ({ label, oakID }) => {
         const blob = new Blob([data], {type: "image/jpeg"})
         const image = URL.createObjectURL(blob);
         setImageUrl(image)
-
-
-
-        // if (data.image_data) {
-        //   console.log("WS DATA", data)
-        //   setImageUrl(`data:image/jpeg;base64,${data.image_data}`);
-        // }
       };
 
       ws.onerror = (error) => {
@@ -65,7 +55,7 @@ const CameraView: React.FC<CameraViewProps> = ({ label, oakID }) => {
       {label}
       <div className="cameraview-component">
         {imageUrl ? (
-        <img src={imageUrl} alt={`Camera ${oakID} view`} />
+        <img src={imageUrl} alt={`Camera ${oakID} view`} className="Stream"/>
         ) : (
         <p>connecting to camera...</p>
         )}
