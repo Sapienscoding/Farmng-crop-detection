@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect} from "react";
 
 // import { SubscribeReply, OakFrame } from "farm_ng_proto";
 // import { error } from "console";
@@ -10,67 +10,65 @@ interface CameraViewProps {
 }
 
 const CameraView: React.FC<CameraViewProps> = ({ label, oakID }) => {
-  // const [imageSrc, setImageSrc] = useState<string>("");
-  const imageSrc = useRef<HTMLImageElement>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const url_1 = `ws://${window.location.host}:${window.location.port}/preview/${oakID}`;
-    const ws = new WebSocket(url_1);
+    let ws: WebSocket | null = null;
 
-    ws.onopen = () => {
-      console.log('Websocket connected');
-      setIsConnected(true);
+    
+
+    const connectWebSocket = () => {
+      const oakNumber = oakID.replace('Oak', '');
+      ws = new WebSocket(`ws://${window.location.hostname}:8042/subscribe/oak/${oakNumber}/rgb`);
+
+      ws.binaryType = "arraybuffer";
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+      };
+
+      ws.onmessage = (event) => {
+        const data = event.data;
+        const blob = new Blob([data], {type: "image/jpeg"})
+        const image = URL.createObjectURL(blob);
+        setImageUrl(image)
+
+
+
+        // if (data.image_data) {
+        //   console.log("WS DATA", data)
+        //   setImageUrl(`data:image/jpeg;base64,${data.image_data}`);
+        // }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket closed');
+        // Attempt to reconnect after a delay
+        
+      };
     };
 
-    ws.onmessage = (Event) => {
-      if (imageSrc.current) {
-        const blob = new Blob([Event.data], {type:'image/jpeg'});
-        const url = URL.createObjectURL(blob);
-        imageSrc.current.src = url;
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('Webscocket error:', error);
-      setIsConnected(false);
-    };
+    connectWebSocket();
 
     return () => {
-      ws.close();
+      if (ws) {
+        ws.close();
+      }
     };
-  },[oakID]);
-
-  //   ws.binaryType = "arraybuffer";
-
-  //   ws.onmessage = async (event: MessageEvent) => {
-  //     const data = await event.data;
-
-  //     const dataArray = new Uint8Array(data);
-
-  //     const reply = SubscribeReply.fromBinary(dataArray);
-
-  //     const frame = OakFrame.fromBinary(reply.paylaod);
-
-  //     const blob = new Blob([frame.imageData], { type: "image/jpeg" });
-
-  //     const imageUrl = URL.createObjectURL(blob);
-
-  //     setImageSrc(imageUrl);
-  //   };
-  // }, [label]);
-
+  }, [oakID]);
   return (
     <div className="camera-label">
       {label}
       <div className="cameraview-component">
-      {/* <label htmlFor={label}>{label}</label>
-      {imageSrc === "" ? <div></div> : <img src={imageSrc}></img>} */}
-      {isConnected ? (
-        <img ref={imageSrc} alt={'Oak' + {label}}/>
-      ) : (
-        <div>connecting to camera...</div>
-      )}
+        {imageUrl ? (
+        <img src={imageUrl} alt={`Camera ${oakID} view`} />
+        ) : (
+        <p>connecting to camera...</p>
+        )}
       </div>
     </div>
   );
