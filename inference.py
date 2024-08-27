@@ -17,9 +17,10 @@ np.bool = np.bool_
 class YoloInference():
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
+        self.model = None
         
 
-    async def run_model(self,img_frame, model_path: Path) -> None:
+    async def run_model(self,img_frame, model_path: Path) -> bytes:
         # Load YOLO model
         model = YOLO(model_path)
         print("executing......\n")
@@ -85,3 +86,6 @@ class YoloInference():
             print(f'code total = {int(1000*(t4-t0))}ms')
             # print(f'total = {int(1000*(t4-ds))}ms')
             t_end = time.monotonic()
+        # Convert the image to bytes
+        _, buffer = cv2.imencode('.jpg', image)
+        return buffer.tobytes()

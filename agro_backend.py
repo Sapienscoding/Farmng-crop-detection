@@ -13,7 +13,7 @@ from farm_ng.core.event_client_manager import (
 from farm_ng.core.event_service_pb2 import (EventServiceConfigList, SubscribeRequest, SubscribeReply)
 from farm_ng.core.events_file_reader import proto_from_json_file
 from farm_ng.core.uri_pb2 import Uri
-from fastapi import FastAPI,WebSocket
+from fastapi import FastAPI,WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,8 +25,10 @@ class AgroVisionApp(FastAPI):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.frame = None
-
         self.inference = YoloInference()
+        self.inference_running = False
+        self.current_oak = None
+        
         self.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],  # Allows all origins
@@ -43,12 +45,12 @@ class AgroVisionApp(FastAPI):
     def shutdown(self) -> None:
         print("Shutting down application: AgroVision")
     
-    async def start_inference(self):
-        #run it on different thread using asyncio
-        while True:
-            if self.frame is not None:
-                await self.inference.run_model(self.frame, args.model_path)
-                await asyncio.sleep(0)
+    # async def start_inference(self):
+    #     #run it on different thread using asyncio
+    #     while True:
+    #         if self.frame is not None:
+    #             await self.inference.run_model(self.frame, args.model_path)
+    #             await asyncio.sleep(0)
                 
 
 app = AgroVisionApp()
@@ -63,28 +65,63 @@ async def shutdown_event():
 # to store the events clients
 clients: dict[str, EventClient] = {}
 
-@app.post('/oak/{oaknum}')
-# create grpc client
-async def SelectCamera(oaknum:int):
-    if oaknum not in [0,1]:
-        raise
-    client: EventClient = (
-        event_manager.clients['amiga']
-    )
-    print(f'receiving request for oak{oaknum}')
-    async for _, msg in client.subscribe(
-        SubscribeRequest(
-            uri=Uri(path=f"/rgb", query=f"service_name=oak/{oaknum}"),
-            every_n=2,
-        ),
-        decode=True,
-    ):
-        app.frame = msg.image_data
+# @app.post('/oak/{oaknum}')
+# # create grpc client
+# async def SelectCamera(oaknum:int):
+#     if oaknum not in [0,1]:
+#         raise
+#     client: EventClient = (
+#         event_manager.clients['amiga']
+#     )
+#     print(f'receiving request for oak{oaknum}')
+#     async for _, msg in client.subscribe(
+#         SubscribeRequest(
+#             uri=Uri(path=f"/rgb", query=f"service_name=oak/{oaknum}"),
+#             every_n=2,
+#         ),
+#         decode=True,
+#     ):
+#         app.frame = msg.image_data
 
-@app.post('/start_inference')
-# create grpc client
-async def start_inference():
-    asyncio.create_task(app.start_inference())
+@app.websocket('/inference')
+async def inference_websocket(websocket:WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            oaknum = int(data.replace('Oak', ''))
+            if oaknum not in [0,1]:
+                await websocket.send_text("Invalid camera selection")
+            else:
+                app.current_oak = oaknum
+                app.inference_running = True
+                await websocket.send_text(f"Inference started on camera Oak{oaknum}")
+    except WebSocketDisconnect:
+        print("Inference WebSocket disconnected")
+        app.inference_running = False
+        app.current_oak = None
+
+@app.websocket("/inference_stream/{oaknum}")
+async def inference_stream(websocket: WebSocket, oaknum: int):
+        await websocket.accept()
+        client: EventClient = event_manager.clients['amiga']
+        try:
+            while app.inference_running and app.current_oak == oaknum:
+                async for _, msg in client.subscribe(
+                SubscribeRequest(
+                    uri=Uri(path=f"/rgb", query=f"service_name=oak/{oaknum}"),
+                    every_n=2,
+                ),
+                decode=True,
+            ):
+                    app.frame = msg.image_data
+                    result = await app.inference.run_model(app.frame, args.model_path)
+                    await websocket.send_bytes(result)
+        except WebSocketDisconnect:
+            print("Inference stream WebSocket disconnected")
+        finally:
+            app.inference_running = False
+            app.current_oak = None
 
 # @app.websocket("/subscribe/{service_name}/{uri_path:path}")
 @app.websocket("/subscribe/{service_name}/{sub_service_name}/{uri_path:path}")
@@ -133,6 +170,7 @@ async def subscribe(
         await websocket.send_bytes(msg.image_data)
 
     await websocket.close()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

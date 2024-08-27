@@ -1,21 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import DropdownSelect from './DropdownSelect';
 import CameraView from './CameraView';
+import ExitButton from './ExitButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlay, faBackward } from '@fortawesome/free-solid-svg-icons';
+import {faPlay} from '@fortawesome/free-solid-svg-icons';
 
 const HomeScreen: React.FC = () => {
   const [selectedCrop, setSelectedCrop] = useState('Strawberry');
   const [selectedCamera, setSelectedCamera] = useState('Oak0');
+  const [inferenceRunning, setInferenceRunning] = useState(false);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+
+  useEffect(() => {
+    const socket = new WebSocket(`ws://${window.location.hostname}:8042/inference`);
+    
+    socket.onopen = () => {
+      console.log('WebSocket connected for inference');
+      setWs(socket);
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket closed for inference');
+      setWs(null);
+      setInferenceRunning(false);
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, []);
 
   const handleStartInference = () => {
     console.log('Starting inference');
-    // Add your inference logic here
-  };
-
-  const handleExit = () => {
-    console.log('Exiting app');
-    // Add your exit logic here
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(selectedCamera);
+      setInferenceRunning(true);
+      console.log('Starting inference for', selectedCamera);
+    } else {
+      console.error('WebSocket is not connected');
+    }
   };
 
   return (
@@ -39,13 +62,16 @@ const HomeScreen: React.FC = () => {
         <CameraView
           label={selectedCamera + " View"}
           oakID={selectedCamera}
+          inferenceRunning = {inferenceRunning}
+          expanded={inferenceRunning}
         />
       </div>
       <div className='button-component'>
-        <button className='exit' onClick={handleExit}>
-          <FontAwesomeIcon icon={faBackward} size="xs"/>Exit to launcher</button>
-        <button className='start-inference' onClick={handleStartInference}>
-          <FontAwesomeIcon icon={faPlay} size="xs"/>Start Inference</button>
+        <ExitButton/>
+        <button className='start-inference' onClick={handleStartInference} disabled={inferenceRunning}>
+          <FontAwesomeIcon icon={faPlay} size="xs"/>
+          {inferenceRunning ? 'Inference Running' : 'Start Inference'}
+        </button>
       </div>
     </div>
   );

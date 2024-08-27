@@ -3,10 +3,12 @@ import React, { useState, useEffect} from "react";
 interface CameraViewProps {
   label: string;
   oakID: string;
+  inferenceRunning: boolean;
+  expanded: boolean;
   
 }
 
-const CameraView: React.FC<CameraViewProps> = ({ label, oakID }) => {
+const CameraView: React.FC<CameraViewProps> = ({ label, oakID, inferenceRunning, expanded }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,7 +18,9 @@ const CameraView: React.FC<CameraViewProps> = ({ label, oakID }) => {
 
     const connectWebSocket = () => {
       const oakNumber = oakID.replace('Oak', '');
-      ws = new WebSocket(`ws://${window.location.hostname}:8042/subscribe/oak/${oakNumber}/rgb`);
+      const wsUrl = inferenceRunning ? `ws://${window.location.hostname}:8042/subscribe/oak/${oakNumber}` : `ws://${window.location.hostname}:8042/subscribe/oak/${oakNumber}/rgb`;
+      
+      ws = new WebSocket(wsUrl);
 
       ws.binaryType = "arraybuffer";
 
@@ -37,8 +41,6 @@ const CameraView: React.FC<CameraViewProps> = ({ label, oakID }) => {
 
       ws.onclose = () => {
         console.log('WebSocket closed');
-        // Attempt to reconnect after a delay
-        
       };
     };
 
@@ -49,9 +51,9 @@ const CameraView: React.FC<CameraViewProps> = ({ label, oakID }) => {
         ws.close();
       }
     };
-  }, [oakID]);
+  }, [oakID, inferenceRunning]);
   return (
-    <div className="camera-label">
+    <div className={`camera-label ${expanded ? 'expanded' : ' '}`}>
       {label}
       <div className="cameraview-component">
         {imageUrl ? (
