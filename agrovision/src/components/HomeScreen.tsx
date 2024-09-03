@@ -12,7 +12,7 @@ const HomeScreen: React.FC = () => {
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   useEffect(() => {
-    const socket = new WebSocket(`ws://${window.location.hostname}:8042/inference`);
+    const socket = new WebSocket(`ws://${window.location.hostname}:8043/inference`);
     
     socket.onopen = () => {
       console.log('WebSocket connected for inference');
@@ -31,11 +31,10 @@ const HomeScreen: React.FC = () => {
   }, []);
 
   const handleStartInference = () => {
-    console.log('Starting inference');
+    console.log('Toggling inference');
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(selectedCamera);
-      setInferenceRunning(true);
-      console.log('Starting inference for', selectedCamera);
+      console.log('Toggling inference for', selectedCamera);
     } else {
       console.error('WebSocket is not connected');
     }
@@ -68,9 +67,9 @@ const HomeScreen: React.FC = () => {
       </div>
       <div className='button-component'>
         <ExitButton/>
-        <button className='start-inference' onClick={handleStartInference} disabled={inferenceRunning}>
+        <button className='start-inference' onClick={handleStartInference}>
           <FontAwesomeIcon icon={faPlay} size="xs"/>
-          {inferenceRunning ? 'Inference Running' : 'Start Inference'}
+          {inferenceRunning ? 'Stop Inference' : 'Start Inference'}
         </button>
       </div>
     </div>

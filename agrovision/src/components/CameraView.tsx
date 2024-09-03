@@ -18,9 +18,8 @@ const CameraView: React.FC<CameraViewProps> = ({ label, oakID, inferenceRunning,
 
     const connectWebSocket = () => {
       const oakNumber = oakID.replace('Oak', '');
-      const wsUrl = inferenceRunning ? `ws://${window.location.hostname}:8042/subscribe/oak/${oakNumber}` : `ws://${window.location.hostname}:8042/subscribe/oak/${oakNumber}/rgb`;
+      ws = new WebSocket(`ws://${window.location.hostname}:8043/subscribe/oak/${oakNumber}/rgb`);
       
-      ws = new WebSocket(wsUrl);
 
       ws.binaryType = "arraybuffer";
 
@@ -51,7 +50,7 @@ const CameraView: React.FC<CameraViewProps> = ({ label, oakID, inferenceRunning,
         ws.close();
       }
     };
-  }, [oakID, inferenceRunning]);
+  }, [oakID]);
   return (
     <div className={`camera-label ${expanded ? 'expanded' : ' '}`}>
       {label}

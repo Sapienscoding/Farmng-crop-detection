@@ -5,11 +5,11 @@
         "type": "app",
         "exec_cmd": "/mnt/managed_home/farm-ng-user-dhruvsh/objdet/bin/python3 /mnt/managed_home/farm-ng-user-dhruvsh/models/agro_backend.py",
         "args": [
-          "--config /mnt/managed_home/farm-ng-user-dhruvsh/models/config.json", "--port 8042", 
+          "--config /mnt/managed_home/farm-ng-user-dhruvsh/models/config.json", "--port 8043", 
           "--model-path /mnt/managed_home/farm-ng-user-dhruvsh/models/yv8_64.engine"
         ],
         "autostart": true,
-        "app_route": "8042",
+        "app_route": "8043",
         "display_name": "AgroVision"
       }
     }
