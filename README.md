@@ -1,5 +1,7 @@
 # <center>AgroVision: A crop-detection application for precision-farming with Amiga</center> 
 
+![Deployed application and its working](agrovision/agrovision_visual.png)
+
 ## 📌 Introduction
  It is an app for the amiga which can help farmers to enhance their farm output by providing them valuable insights about their field, spanning from classificatio between mature and immature crops, to detecting weeds or pests.
 
